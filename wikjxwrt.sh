@@ -234,8 +234,10 @@ echo -e "$ICON_SUCCESS golang 替换完成"
 # 清理临时目录
 rm -rf ../temp_clones
 
-# 安装 feeds（只执行一次）
-info "安装 feeds..."
+# 安装 feeds（执行两次确保成功）
+info "安装 feeds（第一次）..."
+./scripts/feeds install -a || warn "第一次 feeds 安装可能有警告，继续..."
+info "安装 feeds（第二次确保）..."
 ./scripts/feeds install -a
 echo -e "$ICON_SUCCESS feeds 安装完成"
 

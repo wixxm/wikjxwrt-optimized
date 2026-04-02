@@ -1,19 +1,28 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
+# File: .github/workflows/openwrt-builder.yml
+# Description: Build OpenWrt using GitHub Actions - 优化版
+#
+# 优化点:
+# 1. ccache 缓存加速二次编译
+# 2. 增量编译支持
+# 3. 更好的错误处理
+# 4. feeds install 两次确保成功
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
 
-name: OpenWrt Builder
+name: OpenWrt Builder (Optimized)
 
 on:
   workflow_dispatch:
+    inputs:
+      incremental:
+        description: '增量编译（复用缓存）'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
   REPO_URL: https://github.com/wixxm/OpenWrt-24.10
@@ -26,6 +35,9 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+  # ccache 配置
+  CCACHE_DIR: /workdir/ccache
+  CCACHE_SIZE: 5G
 
 jobs:
   build:
@@ -45,6 +57,28 @@ jobs:
         remove-android: 'true'
         remove-haskell: 'true'
 
+    - name: Cache ccache
+      id: cache-ccache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ccache-openwrt-24.10-${{ github.run_id }}
+        restore-keys: |
+          ccache-openwrt-24.10-
+
+    - name: Cache build directories
+      id: cache-build
+      if: github.event.inputs.incremental == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          /workdir/openwrt/build_dir
+          /workdir/openwrt/staging_dir
+          /workdir/openwrt/toolchain
+        key: build-openwrt-24.10-${{ github.run_id }}
+        restore-keys: |
+          build-openwrt-24.10-
+
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -61,18 +95,52 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: Load custom feeds
+        # 初始化 ccache 目录
+        mkdir -p ${{ env.CCACHE_DIR }}
+
+        # 安装 ccache（如果还没有）
+        if ! command -v ccache &> /dev/null; then
+          sudo apt-get install -y ccache
+        fi
+
+        echo "=== ccache 统计（编译前）==="
+        ccache -s
+
+    - name: Load custom feeds (优化版脚本)
       run: |
-        curl -sSL https://raw.githubusercontent.com/wixxm/wikjxwrt/main/wikjxwrt.sh -o wikjxwrt.sh
+        # 从优化版仓库拉取脚本
+        curl -sSL https://raw.githubusercontent.com/wixxm/wikjxwrt-optimized/main/wikjxwrt.sh -o wikjxwrt.sh
         chmod +x wikjxwrt.sh
-        ./wikjxwrt.sh
+        # 传递增量编译参数
+        if [ "${{ github.event.inputs.incremental }}" == "true" ]; then
+          echo "=== 启用增量编译模式 ==="
+          ./wikjxwrt.sh --incremental --skip-compile
+        else
+          echo "=== 全新编译模式 ==="
+          ./wikjxwrt.sh --skip-compile
+        fi
 
     - name: Compile the firmware
       id: compile
+      env:
+        CCACHE_DIR: ${{ env.CCACHE_DIR }}
       run: |
         cd openwrt
+        
+        # 配置 ccache
+        export CCACHE_DIR="${{ env.CCACHE_DIR }}"
+        export CCACHE_SIZE="${{ env.CCACHE_SIZE }}"
+        
+        # 启用 ccache 编译
+        echo 'CONFIG_CCACHE=y' >> .config
+        echo 'CONFIG_TOOLCHAIN_OPTIONS_CCACHE=y' >> .config
+        
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
+        
+        echo "=== ccache 统计（编译后）==="
+        ccache -s
+        
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -110,18 +178,18 @@ jobs:
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        # 生成带有随机前缀的标签（🌈wikjxwrt-YYYYMMDD）
-        DATE_TAG=$(date +"%Y%m%d")
-        PREFIXES=("🌈" "✨" "🚀" "🔥" "🌟" "⚡" "🎉" "🌻" "💡")  # 可选前缀符号
+        # 生成带有随机前缀的标签（⚡wikjxwrt-YYYYMMDD-HHMM）
+        DATE_TAG=$(date +"%Y%m%d-%H%M")
+        PREFIXES=("⚡" "🌈" "✨" "🚀" "🔥" "🌟" "🎉" "🌻" "💡")
         RAND_PREFIX="${PREFIXES[$RANDOM % ${#PREFIXES[@]}]}"
-        TAG_NAME="${RAND_PREFIX}wikjxwrt-${DATE_TAG}"  
-        # 输出 release_tag 变量
+        TAG_NAME="${RAND_PREFIX}wikjxwrt-${DATE_TAG}"
         echo "release_tag=${TAG_NAME}" >> $GITHUB_OUTPUT
-        # 生成 Release 说明
         echo "🚀 OpenWrt 24.10 编译完成！" > release.txt
-        echo "📅 编译日期: $(date +"%Y-%m-%d")" >> release.txt
+        echo "📅 编译日期: $(date +"%Y-%m-%d %H:%M")" >> release.txt
         echo "📦 源码版本: openwrt-24.10" >> release.txt
         echo "🔗 固件仅包含 squashfs & ext4 格式" >> release.txt
+        echo "" >> release.txt
+        echo "💡 优化项: ccache缓存 + 并行克隆 + 增量编译支持" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
@@ -140,7 +208,7 @@ jobs:
         retain_days: 5
         keep_minimum_runs: 10
       env:
-       GITHUB_TOKEN: ${{ secrets.GH_PAT }}  
+       GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@master
