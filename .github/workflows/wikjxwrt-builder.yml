@@ -55,7 +55,7 @@ jobs:
        
     - name: Load custom feeds
       run: |
-        curl -sSL https://raw.githubusercontent.com/wixxm/wikjxwrt/main/wikjxwrt.sh -o wikjxwrt.sh
+        curl -sSL https://raw.githubusercontent.com/wixxm/wikjxwrt-optimized/main/wikjxwrt.sh -o wikjxwrt.sh
         chmod +x wikjxwrt.sh
         ./wikjxwrt.sh
 
