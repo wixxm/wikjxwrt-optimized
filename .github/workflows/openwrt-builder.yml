@@ -47,12 +47,21 @@ jobs:
     - name: Checkout
       uses: actions/checkout@main
 
+    - name: Clean up disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo apt-get clean
+        sudo journalctl --vacuum-time=1s
+        sudo find /var/cache -type f -delete 2>/dev/null || true
+        df -h /
+
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
-        root-reserve-mb: 10240
+        root-reserve-mb: 6144
         temp-reserve-mb: 100
-        swap-size-mb: 8192
+        swap-size-mb: 4096
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
