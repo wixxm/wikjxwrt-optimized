@@ -233,7 +233,6 @@ echo -e "$ICON_SUCCESS golang 替换完成"
 
 # 先复制 .config 文件，再清理临时目录
 cp ../temp_clones/config_repo/6.6/.config .config 2>/dev/null || warn ".config 不在预期位置"
-cp ../temp_clones/config_repo/6.6/2.config 2.config 2>/dev/null || warn "2.config 不在预期位置"
 echo -e "$ICON_SUCCESS .config 配置完成"
 
 # 清理临时目录
