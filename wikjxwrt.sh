@@ -255,6 +255,7 @@ mv temp_clones/config_repo/6.6/.config openwrt/ 2>/dev/null || warn ".config 不
 rm -rf temp_clones
 cd openwrt || error "进入 openwrt 目录失败！"
 make defconfig
+cd ..
 echo -e "$ICON_SUCCESS .config 配置完成"
 
 # ============================================================
