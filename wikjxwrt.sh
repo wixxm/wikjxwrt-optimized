@@ -231,6 +231,11 @@ rm -rf feeds/packages/lang/golang
 mv ../temp_clones/golang feeds/packages/lang/golang
 echo -e "$ICON_SUCCESS golang 替换完成"
 
+# 先复制 .config 文件，再清理临时目录
+cp ../temp_clones/config_repo/6.6/.config .config 2>/dev/null || warn ".config 不在预期位置"
+cp ../temp_clones/config_repo/6.6/2.config 2.config 2>/dev/null || warn "2.config 不在预期位置"
+echo -e "$ICON_SUCCESS .config 配置完成"
+
 # 清理临时目录
 rm -rf ../temp_clones
 
@@ -248,12 +253,14 @@ for entry in "$WIKJXWRT_ENTRY" "$PASSWALL_ENTRY" "$PASSWALL_PACKAGES_ENTRY"; do
 done
 echo -e "$ICON_SUCCESS feeds 注释完成"
 
-# 配置 .config
-step "配置 .config..."
-cd ..
-mv temp_clones/config_repo/6.6/.config openwrt/ 2>/dev/null || warn ".config 不在预期位置"
-rm -rf temp_clones
+# 使用预设的 .config 文件进行配置
+step "使用预设 .config 配置..."
 cd openwrt || error "进入 openwrt 目录失败！"
+if [[ -f ".config" ]]; then
+    echo -e "$ICON_SUCCESS .config 已就位"
+else
+    echo -e "$ICON_WARN .config 未找到"
+fi
 make defconfig
 cd ..
 echo -e "$ICON_SUCCESS .config 配置完成"
