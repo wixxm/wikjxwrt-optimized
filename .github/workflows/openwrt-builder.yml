@@ -63,7 +63,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /workdir/ccache
-        key: ccache-openwrt-24.10-${{ github.run_id }}
+        key: ccache-openwrt-24.10-main
         restore-keys: |
           ccache-openwrt-24.10-
 
