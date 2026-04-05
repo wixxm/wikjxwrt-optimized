@@ -254,6 +254,9 @@ echo -e "$ICON_SUCCESS feeds 注释完成"
 
 # 使用预设的 .config 文件进行配置
 step "使用预设 .config 配置..."
+# 确保当前目录是仓库根目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR" || error "无法切换到脚本目录"
 cd openwrt || error "进入 openwrt 目录失败！"
 if [[ -f ".config" ]]; then
     echo -e "$ICON_SUCCESS .config 已就位"
